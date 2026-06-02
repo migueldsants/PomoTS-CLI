@@ -1,179 +1,129 @@
-import inquirer from 'inquirer';
-import { Cronometer } from './cronometer.js';
-import figlet from 'figlet';
-import chalk from "chalk";
 import readline from 'readline';
+import { Cronometer } from './cronometer.js';
+import { renderTimer } from '../ui/timerDisplay.js';
+import { addRecord } from '../stats/history.js';
+import type { AppSettings, TimerPhase } from '../types/index.js';
 
-let isTimerRunning = false;
+let keypressInitialized = false;
 
-export async function timer(initialTime: number, breakInitialTime: number): Promise<string> {
-    if (isTimerRunning) {
-        console.log(chalk.yellow('\nA timer is already running. Please complete or stop it before starting a new one.\n'));
-        return 'back';
-    }
-
-    isTimerRunning = true;
+export async function startPomodoro(settings: AppSettings): Promise<void> {
+    let phase: TimerPhase = 'work';
     let isPaused = false;
-    let isBreakTime = false;
-    let currentInitialTime = initialTime;
+    let completedWorkSessions = 0;
+    let currentDuration = settings.workDuration * 60;
 
-    const cronometer = new Cronometer(currentInitialTime, (seconds: number) => {
-        const minutes = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        const msg = `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-
-        figlet.text(
-            msg,
-            { font: "ANSI Shadow" },
-            (err: Error | null, data?: string) => {
-                if (err || !data) {
-                    console.error(err);
-                    return;
-                }
-                console.clear();
-                console.log(chalk.green(`${isBreakTime ? '🍅 Break Time' : '🍅 Work Time'}`));
-                console.log(chalk[isBreakTime ? 'green' : 'red']("\n" + data));
-            }
-        );
+    const cronometer = new Cronometer(currentDuration, (seconds: number) => {
+        renderTimer(seconds, phase, isPaused, completedWorkSessions + 1);
 
         if (seconds <= 0 && !isPaused) {
-            if (!isBreakTime) {
-                isBreakTime = true;
-                currentInitialTime = breakInitialTime;
+            // 🔔 Audible notification
+            process.stdout.write('\x07');
+
+            // Record completed session
+            addRecord({
+                type: phase,
+                duration: currentDuration,
+                completedAt: new Date().toISOString(),
+            });
+
+            // Transition to next phase
+            if (phase === 'work') {
+                completedWorkSessions++;
+                if (
+                    completedWorkSessions % settings.sessionsBeforeLongBreak ===
+                    0
+                ) {
+                    phase = 'longBreak';
+                    currentDuration = settings.longBreakDuration * 60;
+                } else {
+                    phase = 'break';
+                    currentDuration = settings.breakDuration * 60;
+                }
             } else {
-                isBreakTime = false;
-                currentInitialTime = initialTime;
+                phase = 'work';
+                currentDuration = settings.workDuration * 60;
             }
-            cronometer.reset(currentInitialTime);
+
+            cronometer.reset(currentDuration);
             cronometer.start();
         }
     });
 
+    // Initial render + start
+    renderTimer(currentDuration, phase, isPaused, completedWorkSessions + 1);
     cronometer.start();
 
-    while (true) {
-        if (isPaused) {
-            const action = await showTimerMenuPaused(isBreakTime);
+    return new Promise<void>((resolve) => {
+        // Only initialize keypress events once to avoid duplicate listeners
+        if (!keypressInitialized) {
+            readline.emitKeypressEvents(process.stdin);
+            keypressInitialized = true;
+        }
 
-            switch (action) {
-                case 'resume':
-                    cronometer.start();
-                    isPaused = false;
-                    break;
-                case 'restart':
-                    cronometer.reset(currentInitialTime);
-                    cronometer.start();
-                    isPaused = false;
-                    break;
-                case 'breaktime':
-                    isBreakTime = true;
-                    currentInitialTime = breakInitialTime;
-                    cronometer.reset(breakInitialTime);
-                    cronometer.start();
-                    isPaused = false;
-                    break;
-                case 'backToWork':
-                    if (isBreakTime) {
-                        isBreakTime = false;
-                        currentInitialTime = initialTime;
-                        cronometer.reset(initialTime);
-                        cronometer.start();
-                        isPaused = false;
-                    }
-                    break;
-                case 'back':
-                    cronometer.destroy();
-                    isTimerRunning = false;
-                    return 'back';
+        if (process.stdin.isTTY) process.stdin.setRawMode(true);
+        process.stdin.resume();
+
+        const onKeypress = (
+            _str: string | undefined,
+            key: readline.Key,
+        ): void => {
+            if (!key) return;
+
+            // Quit
+            if (key.name === 'q' || (key.ctrl && key.name === 'c')) {
+                cleanup();
+                resolve();
+                return;
             }
-        } else {
-            const action = await showTimerMenu(isBreakTime);
 
-            switch (action) {
-                case 'pause':
-                    cronometer.pause();
-                    isPaused = true;
-                    break;
-                case 'restart':
-                    cronometer.reset(currentInitialTime);
-                    cronometer.start();
-                    break;
-                case 'breaktime':
-                    isBreakTime = true;
-                    currentInitialTime = breakInitialTime;
-                    cronometer.reset(breakInitialTime);
-                    cronometer.start();
-                    break;
-                case 'backToWork':
-                    if (isBreakTime) {
-                        isBreakTime = false;
-                        currentInitialTime = initialTime;
-                        cronometer.reset(initialTime);
+            switch (key.name) {
+                // Pause / Resume toggle
+                case 'p':
+                case 'space':
+                    isPaused = !isPaused;
+                    if (isPaused) {
+                        cronometer.pause();
+                    } else {
                         cronometer.start();
                     }
+                    renderTimer(
+                        cronometer.getTime(),
+                        phase,
+                        isPaused,
+                        completedWorkSessions + 1,
+                    );
                     break;
-                case 'back':
-                    cronometer.destroy();
-                    isTimerRunning = false;
-                    return 'back';
+
+                // Restart current phase
+                case 'r':
+                    cronometer.reset(currentDuration);
+                    cronometer.start();
+                    isPaused = false;
+                    break;
+
+                // Toggle work ↔ break
+                case 'b':
+                    if (phase === 'work') {
+                        phase = 'break';
+                        currentDuration = settings.breakDuration * 60;
+                    } else {
+                        phase = 'work';
+                        currentDuration = settings.workDuration * 60;
+                    }
+                    cronometer.reset(currentDuration);
+                    cronometer.start();
+                    isPaused = false;
+                    break;
             }
+        };
+
+        process.stdin.on('keypress', onKeypress);
+
+        function cleanup(): void {
+            process.stdin.removeListener('keypress', onKeypress);
+            if (process.stdin.isTTY) process.stdin.setRawMode(false);
+            cronometer.destroy();
+            console.clear();
         }
-
-        await new Promise(resolve => setTimeout(resolve, 100));
-    }
+    });
 }
-
-export async function showTimerMenu(isBreakTime: boolean = false): Promise<string> {
-    const choices = isBreakTime
-        ? [
-            { name: 'Pause', value: 'pause' },
-            { name: 'Restart', value: 'restart' },
-            { name: 'Back to Work', value: 'backToWork' },
-            { name: 'Go Back', value: 'back' }
-        ]
-        : [
-            { name: 'Pause', value: 'pause' },
-            { name: 'Break Time', value: 'breaktime' },
-            { name: 'Restart', value: 'restart' },
-            { name: 'Go Back', value: 'back' }
-        ];
-
-    const { action } = await inquirer.prompt([
-        {
-            type: 'rawlist',
-            name: 'action',
-            message: `Options:`,
-            choices: choices,
-        }
-    ]);
-
-    return action;
-}
-
-export async function showTimerMenuPaused(isBreakTime: boolean = false): Promise<string> {
-    const choices = isBreakTime
-        ? [
-            { name: 'Resume', value: 'resume' },
-            { name: 'Restart', value: 'restart' },
-            { name: 'Back to Work', value: 'backToWork' },
-            { name: 'Go Back', value: 'back' }
-        ]
-        : [
-            { name: 'Resume', value: 'resume' },
-            { name: 'Break Time', value: 'breaktime' },
-            { name: 'Restart', value: 'restart' },
-            { name: 'Go Back', value: 'back' }
-        ];
-
-    const { action } = await inquirer.prompt([
-        {
-            type: 'rawlist',
-            name: 'action',
-            message: `Options:`,
-            choices: choices,
-        }
-    ]);
-
-    return action;
-}
-//SecretTomato.🍅
