@@ -1,46 +1,41 @@
-import figlet from "figlet";
-import chalk from "chalk";
-import chalkAnimation from "chalk-animation";
+import figlet from 'figlet';
+import chalk from 'chalk';
+import chalkAnimation from 'chalk-animation';
+import { FIGLET_FONT, APP_TITLE } from '../constants.js';
 
+const sleep = (ms: number = 2000): Promise<void> =>
+    new Promise((resolve) => setTimeout(resolve, ms));
 
-async function startup(title: string): Promise<void> {
+async function startup(): Promise<void> {
     console.clear();
-    await titleScreen(title);
+    await titleScreen();
     await showBanner();
 }
 
 export default startup;
 
-const sleep = (ms: number = 2000): Promise<void> =>
-    new Promise(resolve => setTimeout(resolve, ms));
-
-async function titleScreen(title: string): Promise<void> {
-
-    const anim = chalkAnimation.rainbow(title);
+async function titleScreen(): Promise<void> {
+    const anim = chalkAnimation.rainbow(APP_TITLE);
     await sleep();
     anim.stop();
 
     console.clear();
-
-    console.log(chalk.green(title));
+    console.log(chalk.green(APP_TITLE));
 }
 
 export function showBanner(): Promise<void> {
     return new Promise((resolve, reject) => {
-        const msg = `pomots`;
-
         figlet.text(
-            msg,
-            { font: "ANSI Shadow" },
+            'pomots',
+            { font: FIGLET_FONT },
             (err: Error | null, data?: string) => {
                 if (err || !data) {
                     reject(err);
                     return;
                 }
-
                 console.log(chalk.red(data));
                 resolve();
-            }
+            },
         );
     });
 }

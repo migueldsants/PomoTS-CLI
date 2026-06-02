@@ -1,18 +1,24 @@
 {
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
 
-    "rootDir": "src",
-    "outDir": "dist",
+        "rootDir": "src",
+        "outDir": "dist",
 
-    "strict": true,
+        "strict": true,
 
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
 
-    "resolveJsonModule": true
-  },
-  "include": ["src"]
+        "resolveJsonModule": true,
+        "skipLibCheck": true,
+
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true
+    },
+    "include": ["src"],
+    "exclude": ["src/**/*.test.ts", "src/**/__tests__/**"]
 }

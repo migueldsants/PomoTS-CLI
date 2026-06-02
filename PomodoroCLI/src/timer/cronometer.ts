@@ -1,12 +1,14 @@
-class Cronometer {
-    private seconds: number = 0;
+export class Cronometer {
+    private seconds: number;
     private intervalId?: ReturnType<typeof setInterval>;
+    private onTick: (seconds: number) => void;
 
-    constructor(private duration: number, private onTick: (seconds: number) => void) {
+    constructor(duration: number, onTick: (seconds: number) => void) {
         this.seconds = duration;
+        this.onTick = onTick;
     }
 
-    start() {
+    start(): void {
         if (this.intervalId) return;
         this.intervalId = setInterval(() => {
             this.seconds--;
@@ -17,16 +19,15 @@ class Cronometer {
         }, 1000);
     }
 
-    pause() {
+    pause(): void {
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = undefined;
         }
     }
 
-    reset(newDuration: number) {
+    reset(newDuration: number): void {
         this.pause();
-        this.duration = newDuration;
         this.seconds = newDuration;
         this.onTick(this.seconds);
     }
@@ -35,10 +36,12 @@ class Cronometer {
         return this.seconds;
     }
 
-    destroy() {
+    isRunning(): boolean {
+        return this.intervalId !== undefined;
+    }
+
+    destroy(): void {
         this.pause();
         this.onTick = () => {};
     }
 }
-
-export { Cronometer };
