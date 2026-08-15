@@ -14,7 +14,7 @@ export function parseCli(): CliOptions {
     program
         .name('pomots')
         .description('🍅 A CLI Pomodoro Timer built with TypeScript')
-        .version('3.0.0')
+        .version('4.0.0')
         .option('-w, --work <minutes>', 'work duration in minutes (use with --start)', parseInt)
         .option('-b, --break <minutes>', 'break duration in minutes (use with --start)', parseInt)
         .option(

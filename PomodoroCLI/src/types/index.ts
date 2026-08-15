@@ -13,4 +13,4 @@ export interface SessionRecord {
 
 export type TimerPhase = 'work' | 'break' | 'longBreak';
 export type TimerResult = 'back';
-export type MenuOption = 'start' | 'settings' | 'stats' | 'exit';
+export type MenuOption = 'start' | 'settings' | 'stats' | 'credits' | 'exit';

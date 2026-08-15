@@ -3,6 +3,7 @@ import inquirer from 'inquirer';
 import { startPomodoro } from '../timer/pomodoro.js';
 import { loadSettings, settingsMenu } from '../timer/settings.js';
 import { showStats } from '../stats/history.js';
+import { showCredits } from './credits.js';
 import type { MenuOption } from '../types/index.js';
 import { APP_TITLE } from '../constants.js';
 
@@ -21,6 +22,7 @@ export async function menuLoop(): Promise<void> {
                     { name: '🍅 Start Pomodoro', value: 'start' },
                     { name: '📊 Statistics', value: 'stats' },
                     { name: '⚙️  Settings', value: 'settings' },
+                    { name: '🎬 Credits', value: 'credits' },
                     { name: '🚪 Exit', value: 'exit' },
                 ],
                 pageSize: 10,
@@ -43,6 +45,10 @@ export async function menuLoop(): Promise<void> {
                 console.clear();
                 console.log(chalk.green(APP_TITLE));
                 await settingsMenu();
+                break;
+
+            case 'credits':
+                await showCredits();
                 break;
 
             case 'exit':
